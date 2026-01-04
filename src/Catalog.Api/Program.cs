@@ -1,41 +1,64 @@
+using Catalog.Application.interfaces;
+using Catalog.Application.Queries;
+using Catalog.Infrastructure.Mapping;
+using Catalog.Infrastructure.Persistence;
+using Catalog.Infrastructure.Repositories;
+using Mapster;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.OpenApi;
+
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
-builder.Services.AddOpenApi();
+// Swagger
+builder.Services.AddSwaggerGen(options =>
+{
+    options.SwaggerDoc("v1", new OpenApiInfo
+    {
+        Title = "Catalog API",
+        Version = "v1",
+        Description = "High-performance Catalog microservice with clean architecture."
+    });
+});
+
+// MediatR
+builder.Services.AddMediatR(cfg =>
+    cfg.RegisterServicesFromAssembly(typeof(GetProductsQueryHandler).Assembly));
+
+// Repositories
+builder.Services.AddTransient<IProductReadRepository, ProductReadRepository>();
+
+// DbContext
+builder.Services.AddDbContext<CatalogDbContext>(opt =>
+    opt.UseSqlServer(builder.Configuration.GetConnectionString("Default")));
+
+// Mapster
+var config = TypeAdapterConfig.GlobalSettings;
+config.Scan(typeof(ProductMappingConfig).Assembly);
+builder.Services.AddSingleton(config);
+
+// Controllers
+builder.Services.AddControllers();
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
+// Developer exception page
 if (app.Environment.IsDevelopment())
 {
-    app.MapOpenApi();
+    app.UseDeveloperExceptionPage();
 }
 
-app.UseHttpsRedirection();
-
-var summaries = new[]
+// Swagger
+app.UseSwagger();
+app.UseSwaggerUI(options =>
 {
-    "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
-};
+    options.SwaggerEndpoint("/swagger/v1/swagger.json", "Catalog API v1");
+    options.RoutePrefix = string.Empty;
+});
 
-app.MapGet("/weatherforecast", () =>
-{
-    var forecast =  Enumerable.Range(1, 5).Select(index =>
-        new WeatherForecast
-        (
-            DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
-            Random.Shared.Next(-20, 55),
-            summaries[Random.Shared.Next(summaries.Length)]
-        ))
-        .ToArray();
-    return forecast;
-})
-.WithName("GetWeatherForecast");
+// Routing
+app.MapControllers();
+
+// Optional: HTTPS
+// app.UseHttpsRedirection();
 
 app.Run();
-
-record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
-{
-    public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
-}
