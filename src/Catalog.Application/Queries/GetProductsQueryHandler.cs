@@ -1,10 +1,10 @@
 ﻿using Catalog.Application.DTOs;
 using Catalog.Application.interfaces;
+using Catalog.Application.Shared.Results;
 using MediatR;
 
 namespace Catalog.Application.Queries;
-
-public sealed class GetProductsQueryHandler : IRequestHandler<GetProductsQuery, IEnumerable<ProductDto>>
+public sealed class GetProductsQueryHandler : IRequestHandler<GetProductsQuery, Result<IEnumerable<ProductDto>>>
 {
     private readonly IProductReadRepository _repo;
 
@@ -13,8 +13,9 @@ public sealed class GetProductsQueryHandler : IRequestHandler<GetProductsQuery, 
         _repo = repo;
     }
 
-    public async Task<IEnumerable<ProductDto>> Handle(GetProductsQuery request,  CancellationToken ct)
+    public async Task<Result<IEnumerable<ProductDto>>> Handle(GetProductsQuery request, CancellationToken ct)
     {
-        return await _repo.GetProductsAsync(ct);
+        var products = await _repo.GetProductsAsync(ct);
+        return Result<IEnumerable<ProductDto>>.Success(products);
     }
 }

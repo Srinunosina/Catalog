@@ -1,31 +1,25 @@
-﻿using Catalog.Domain.Products;
-namespace Catalog.Application.Products.Commands;
-public sealed class CreateProductHandler
-{
+﻿using Catalog.Application.interfaces;
+using Catalog.Application.Shared;
+using Catalog.Application.Shared.Results;
+using Catalog.Domain.Products;
+using MediatR;
 
-    public CreateProductHandler()
+namespace Catalog.Application.Products.Commands;
+public sealed class CreateProductHandler : IRequestHandler<CreateProductCommand, Result<Guid>>
+{
+    private readonly IProductRepository _repository;
+
+    public CreateProductHandler(IProductRepository repository)
     {
+        _repository = repository;
     }
 
-    public async Task<Guid> HandleAsync(CreateProductCommand command, CancellationToken ct = default)
+    public async Task<Result<Guid>> Handle(CreateProductCommand command, CancellationToken ct)
     {
-        //// Application-level validation (shape, existence)
-        //if (string.IsNullOrWhiteSpace(command.Sku))
-        //    throw new ApplicationException("SKU is required.");
+        var product = Product.Create("1.0", command.Name, command.Price);
 
-        //var skuExists = await _db.Products
-        //    .AnyAsync(p => p.Sku == command.Sku, ct);
+        await _repository.AddAsync(product);
 
-        //if (skuExists)
-        //    throw new ApplicationException("SKU must be unique.");
-
-        //// Aggregate creation - domain invariants enforced here
-        //var product = Product.Create(command.Sku, command.Name, command.Price);
-
-        //_db.Products.Add(product);
-        //await _db.SaveChangesAsync(ct);
-
-        // return product.Id;   
-        return new Guid();
+        return Result<Guid>.Success(product.Id);
     }
 }

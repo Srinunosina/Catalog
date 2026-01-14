@@ -1,13 +1,24 @@
-using Catalog.Application.interfaces;
-using Catalog.Application.Queries;
-using Catalog.Infrastructure.Mapping;
-using Catalog.Infrastructure.Persistence;
-using Catalog.Infrastructure.Repositories;
-using Mapster;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.OpenApi;
+using Catalog.Api.Extentions;
+using Catalog.Application.Extensions;
+using Catalog.Infrastructure.Extensions;
+
+
 
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Services
+    .AddPresentation()     // Controllers, Swagger, Middleware
+    .AddApplication()      // MediatR, Behaviors, IResult, Validators
+    .AddInfrastructure(builder.Configuration); // DbContext, Repos, Mapping
+
+var app = builder.Build();
+app.UsePresentation();     // Middleware pipeline
+
+app.Run();
+
+
+/**
+ * var builder = WebApplication.CreateBuilder(args);
 
 // Swagger
 builder.Services.AddSwaggerGen(options =>
@@ -19,6 +30,11 @@ builder.Services.AddSwaggerGen(options =>
         Description = "High-performance Catalog microservice with clean architecture."
     });
 });
+
+//Middlewares
+builder.Services.AddTransient<GlobalExceptionMiddleware>();
+
+builder.Services.AddApplication();
 
 // MediatR
 builder.Services.AddMediatR(cfg =>
@@ -41,6 +57,9 @@ builder.Services.AddControllers();
 
 var app = builder.Build();
 
+//Custom Middelware wiring
+app.UseMiddleware<GlobalExceptionMiddleware>();
+
 // Developer exception page
 if (app.Environment.IsDevelopment())
 {
@@ -62,3 +81,4 @@ app.MapControllers();
 // app.UseHttpsRedirection();
 
 app.Run();
+**/

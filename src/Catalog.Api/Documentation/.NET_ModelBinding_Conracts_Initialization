@@ -1,0 +1,307 @@
+
+Who creates API contract objects if they are NOT in DI?
+Key clarification first
+
+API contracts (request DTOs) are NOT created by DI.
+
+They are created by ASP.NET Core Model Binding, at runtime, per request.
+
+🔍 What actually happens at runtime (step-by-step)
+
+When an HTTP request hits your controller:
+
+POST /products
+Content-Type: application/json
+
+{
+  "sku": "SKU-1",
+  "name": "Product",
+  "price": 10
+}
+
+
+ASP.NET Core does this internally:
+
+1️⃣ Routing selects the action
+public async Task<IActionResult> Create(CreateProductRequest request)
+
+
+ASP.NET sees:
+
+Parameter type: CreateProductRequest
+
+Binding source: body (JSON)
+
+2️⃣ Model Binding kicks in (NOT DI)
+
+ASP.NET Core uses:
+
+IModelBinder
+
+System.Text.Json (by default)
+
+Reflection + expression trees
+
+It does roughly this:
+
+// Pseudocode (simplified)
+var obj = Activator.CreateInstance(typeof(CreateProductRequest));
+
+foreach (property in public settable properties)
+{
+    var value = ReadFromJson(property.Name);
+    property.SetValue(obj, value);
+}
+
+
+Important facts:
+
+Uses reflection
+
+Uses public setters
+
+Happens before controller code executes
+
+Happens outside DI
+
+So the object is:
+
+Created by the framework
+
+Filled during deserialization
+
+Then passed to your controller
+
+🔑 Why this matters
+
+Your contract object must be:
+
+Instantiable by the runtime
+
+Writable during construction
+
+Immutable after construction
+
+This is exactly what init gives you.
+
+2️⃣ Why readonly fields break runtime initialization (with internals)
+
+Now let’s get concrete.
+
+❌ Attempt 1: readonly fields (what people try)
+public sealed class CreateProductRequest
+{
+    public readonly string Sku;
+    public readonly string Name;
+    public readonly decimal Price;
+}
+
+What you expect
+
+“The runtime will set these fields via reflection.”
+
+What actually happens
+
+❌ Model binding fails
+
+Why?
+
+🔬 What ASP.NET Core / System.Text.Json expects
+System.Text.Json (default serializer) expects:
+
+A public parameterless constructor
+
+Public settable properties OR
+
+A parameterized constructor it can match
+
+It does NOT support:
+
+Setting readonly fields post-construction
+
+Arbitrary field injection via reflection (by default)
+
+This is intentional.
+
+🔎 Why readonly fields cannot be set
+CLR rule (very important)
+
+A readonly field can only be assigned:
+
+At declaration, OR
+
+Inside a constructor of the declaring type
+
+Once construction completes:
+
+The CLR enforces immutability
+
+Reflection cannot mutate it safely
+
+So this is illegal at runtime:
+
+fieldInfo.SetValue(obj, "SKU-1"); // ❌ blocked
+
+
+Because:
+
+The object has already been constructed
+
+The field is readonly
+
+The CLR guarantees immutability semantics
+
+🔥 Concrete failure example
+public sealed class CreateProductRequest
+{
+    public readonly string Sku;
+}
+
+
+Incoming JSON:
+
+{ "sku": "SKU-1" }
+
+
+Result:
+
+Sku stays null
+
+ModelState becomes invalid
+
+Or deserialization throws
+
+Because:
+
+The serializer cannot assign to Sku
+
+No constructor parameter exists to bind to
+
+❌ Attempt 2: “Let’s use a constructor”
+public sealed class CreateProductRequest
+{
+    public readonly string Sku;
+    public readonly string Name;
+    public readonly decimal Price;
+
+    public CreateProductRequest(string sku, string name, decimal price)
+    {
+        Sku = sku;
+        Name = name;
+        Price = price;
+    }
+}
+
+Does this work?
+
+⚠️ Sometimes — but fragile
+
+It depends on:
+
+JSON property names
+
+Constructor parameter names
+
+Serializer configuration
+
+Versioning tolerance
+
+This breaks easily when:
+
+You add optional fields
+
+You version the API
+
+You use partial payloads
+
+You enable nullable handling
+
+Also:
+
+ASP.NET validation
+
+ModelState
+
+Filters
+start behaving inconsistently
+
+Why ASP.NET Core prefers properties (by design)
+Framework expectations
+
+ASP.NET Core assumes:
+
+DTOs are shape objects
+
+Properties represent bindable state
+
+Setters are the binding mechanism
+
+Properties:
+
+Work with validation attributes
+
+Work with filters
+
+Work with Swagger
+
+Work with JSON serializers
+
+Work with tooling
+
+Fields:
+
+Bypass all of that
+
+Are invisible to many framework components
+
+Break conventions
+
+✅ Why init is the correct compromise
+public sealed class CreateProductRequest
+{
+    public string Sku { get; init; } = default!;
+}
+
+
+This satisfies all constraints:
+
+At runtime:
+
+ASP.NET can set the property ✔
+
+Reflection sees a setter ✔
+
+JSON can bind ✔
+
+After binding:
+
+Property becomes immutable ✔
+
+No accidental mutation ✔
+
+Deterministic flow ✔
+
+Semantically:
+
+“Input-only” is enforced ✔
+
+Contract is final ✔
+
+🧠 Mental model (lock this in)
+
+ASP.NET Core binds by mutation during construction, not by injection.
+init allows that mutation exactly once.
+
+Readonly fields forbid that mutation — so the runtime cannot do its job.
+
+Final takeaway (architect-grade)
+Option	Works with ASP.NET	Immutable after bind	Tooling-friendly
+readonly fields	❌ No	✅ Yes	❌ No
+setters	✅ Yes	❌ No	✅ Yes
+init	✅ Yes	✅ Yes	✅ Yes
+
+That’s why init exists.
+
+One sentence you can use in reviews
+
+“Readonly fields break ASP.NET model binding because the runtime must mutate objects during deserialization; init allows one-time mutation while preserving immutability afterward.”

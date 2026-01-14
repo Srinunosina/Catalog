@@ -1,0 +1,361 @@
+
+What is a MediatR:
+-------------------------------------
+MediatR is simply a process orchestrator.
+
+In one sentence:
+MediatR executes a request by passing it through a configurable pipeline and then into a handler.
+
+What MediatR gives you technically
+-----------------------------------
+A single execution entry point (Send)
+A pipeline around handlers (IPipelineBehavior)
+Decoupling between caller and handler
+
+What MediatR does not give you
+-------------------------------
+Architecture
+DDD
+Determinism
+Validation
+Transactions
+Logging
+
+You add those via pipeline behaviors — which is exactly what you’re doing.
+
+
+Request Pipeline:
+---------------------------------------------------
+Controller
+  → Behavior 1 (ValidationBehavior)
+      → Behavior 2 (LoggingBehavior)
+          → Behavior 3 (ExceptionHandlingBehavior)
+              → Actual Handler
+
+
+1. ASP.NET Core middleware wraps the HTTP pipeline:
+--------------------------------------------------------------
+
+HTTP Request
+  → Middleware
+      → Routing
+          → Model Binding
+              → Controller
+			  
+2. MediatR behaviors wrap the Application pipeline:
+--------------------------------------------------------------
+
+Controller
+  → MediatR Behaviors
+      → Handler
+          → Domain
+		  
+Two different worlds.
+Two different responsibilities.
+Two different lifecycles.
+
+
+3. ASP.NET Core Middleware Order (Recommended)
+---------------------------------------------------
+Rule:
+-----
+Infrastructure → Observability → Safety → Security → Routing → Endpoints → Dev Tools
+
+ 1️.Hosting / Reverse-Proxy Infrastructure (VERY EARLY)
+   
+   Responsibility : Handles load balancers, HTTPS, headers.
+   
+   Exaple: 1. app.UseForwardedHeaders(); 2. app.UseHttpsRedirection(); 3.app.UseHsts(); // production only
+
+   Purpose: Everything downstream depends on correct scheme, host, and headers.
+   
+ 2. Observability & Diagnostics
+ 
+   Responsibility : Request-level visibility.
+   
+   Exaple: 1. app.UseSerilogRequestLogging(); // or custom correlation-id middleware // OpenTelemetry tracing
+
+   Purpose: Logging, tracing, metrics
+    
+   Not for: No business logic
+
+
+HTTP
+ ↓
+Controller
+ ↓
+┌──────────────────────────────┐
+│ Application Pipeline         │  ← Shock absorber
+│  ├─ Validation               │
+│  ├─ Logging                  │
+│  ├─ ExceptionHandling  ◄─────┼── catches everything below
+│  └─ Transaction              │
+└───────────────┬──────────────┘
+                ↓
+        Application Handler
+                ↓
+             Domain
+                ↓
+         Infrastructure
+
+
+ASP.NET Core (Presentation Layer)
+  └── Controller Action
+        └── mediator.Send(command)
+              └── MediatR Pipeline (Application Layer)
+                    ├── ValidationBehavior
+                    ├── LoggingBehavior
+                    ├── ExceptionHandlingBehavior   👈 YOU ARE HERE
+                    └── Actual Handler (Use Case)
+                          └── Domain Layer
+                                └── Infrastructure
+
+HTTP Request
+   ↓
+Middleware (global try/catch)
+   ↓
+Routing
+   ↓
+Model Binding
+   ↓
+Controller
+   ↓
+mediator.Send()
+   ↓
+MediatR Pipeline
+   ↓
+Handler
+   ↓
+Domain
+   ↓
+Infrastructure
+   ↓
+HTTP Response
+
+
+src/
+  Api/                         ← Presentation Layer (ASP.NET Core)
+    Middleware/                ← ✔ GlobalExceptionMiddleware goes here
+      GlobalExceptionMiddleware.cs
+    Controllers/
+    Extensions/
+    Filters/                   ← (if you use them)
+    Program.cs
+    appsettings.json
+
+  Application/                 ← MediatR, Behaviors, IResult, Commands, Queries
+    Behaviors/
+    Results/
+    Handlers/
+    Interfaces/
+
+  Domain/                      ← Entities, ValueObjects, Domain Exceptions
+    Entities/
+    Exceptions/
+    ValueObjects/
+    Services/
+
+  Infrastructure/              ← EF Core, Repositories, External Services
+    Persistence/
+    Services/
+    Configurations/
+
+
+------------ Contracts : DTO's initilization ----------------
+
+our contract object must be:
+----------------------------
+1.Instantiable by the runtime
+2.Writable during construction
+3.Immutable after construction
+
+This is exactly what init gives you.
+
+
+-------------------------------
+
+IEnumerable vs IReadOnlyCollection — When to choose what
+-----------------------------------------------------
+✔ Why MediatR Behaviors typically use IEnumerable<IValidator<TRequest>>
+Because the DI container resolves validators as a lazy, streaming sequence.
+
+IEnumerable<T> is the most flexible abstraction:
+
+Supports zero, one, or many validators
+
+Supports lazy enumeration
+
+Works with LINQ
+
+Works with DI’s “multiple registrations” pattern
+
+Does not require materializing the collection
+
+✔ When to use IReadOnlyCollection<T>
+Use it when you need:
+
+Count
+
+Indexing
+
+Snapshot semantics
+
+Guarantee that the collection won’t change
+
+✔ Why NOT use IReadOnlyCollection here
+Because:
+
+You don’t need Count
+
+You don’t need indexing
+
+You don’t need snapshot semantics
+
+DI resolves validators lazily
+
+IEnumerable is the idiomatic MediatR pattern
+
+🔥 Rule of thumb
+Use IEnumerable<T> for pipelines, validators, handlers, and DI‑resolved collections.
+
+Use IReadOnlyCollection<T> when you own the collection and want to guarantee immutability.
+
+Your current usage is correct.
+
+2. When to use LoggingBehavior?
+---------------------------------
+✔ LoggingBehavior is used for:
+
+Request start/end logs
+Performance timing
+Correlation IDs
+Debugging slow handlers
+Observability
+
+It is NOT for:
+--------------
+Validation
+Exception translation
+Business logic
+
+✔ Should you add it?
+Yes — if you want observability and traceability.
+
+3️. Is registration order important?
+------------------------------------
+YES.
+MediatR executes behaviors in the order they are registered.
+
+Recommended order:
+Code
+1. ValidationBehavior
+2. LoggingBehavior
+3. ExceptionHandlingBehavior
+Why?
+1. ValidationBehavior first
+Fastest failure
+
+No need to log or catch anything
+
+Prevents unnecessary handler execution
+
+2. LoggingBehavior second
+Logs the request
+
+Logs the response
+
+Measures performance
+
+Wraps the handler but AFTER validation
+
+3. ExceptionHandlingBehavior last
+Catches domain exceptions
+
+Converts them into Result.Failure
+
+Ensures deterministic flow
+
+This order is architecturally correct.
+
+4️⃣ Does ValidationBehavior run before controller action?
+No — and this is important.
+
+✔ Execution order:
+Code
+Controller Action
+    ↓
+mediator.Send()
+    ↓
+ValidationBehavior
+So validation does NOT run before the controller.
+
+It runs after the controller calls mediator.Send(), but before the handler.
+
+✔ Is throwing 400 from ValidationBehavior good?
+Yes — but not directly.
+
+Your flow should be:
+
+ValidationBehavior throws ValidationException
+
+ExceptionHandlingBehavior catches it
+
+Converts to Result.Failure
+
+Controller maps to ProblemDetails(400)
+
+This is deterministic and clean.
+
+5️⃣ What middleware belongs in the Application layer?
+None.
+
+Middleware is UI layer only.
+
+Application layer uses Pipeline Behaviors, not middleware.
+
+✔ UI Layer → Middleware
+GlobalExceptionMiddleware
+
+Authentication
+
+Authorization
+
+CORS
+
+Routing
+
+Swagger
+
+✔ Application Layer → Pipeline Behaviors
+ValidationBehavior
+
+LoggingBehavior
+
+ExceptionHandlingBehavior
+
+PerformanceBehavior
+
+🔥 Rule
+Middleware = HTTP pipeline  
+Behaviors = Application pipeline
+
+Your UseApplication() should remain empty — that’s correct.
+
+Final Architecture (Locked Mental Model)
+Code
+ASP.NET Core Middleware (UI Layer)
+    ↓
+Controller
+    ↓
+ValidationBehavior
+    ↓
+LoggingBehavior
+    ↓
+ExceptionHandlingBehavior
+    ↓
+Handler
+    ↓
+Domain
+    ↓
+Infrastructure
+This is the deterministic pipeline you’ve been building.

@@ -1,0 +1,41 @@
+
+Exception Handling vs Pipeline Behaviors (Clear Mapping)
+
+GLOBAL EXCEPTION MIDDLEWARE
+--------------------------------
+Layer: Infrastructure / HTTP
+Scope: Entire request pipeline
+Handles:
+- NullReferenceException
+- Database connection failures
+- Serialization issues
+- Framework bugs
+
+Returns:
+- ProblemDetails
+- 500 / 502 / 503 responses
+
+Does NOT:
+- Understand domain rules
+- Know business intent
+- Replace application error handling
+
+
+MEDIATR PIPELINE BEHAVIORS
+--------------------------------
+Layer: Application
+Scope: Command / Query execution
+Handles:
+- Validation failures
+- Domain exceptions
+- Business rule violations
+- Expected failure paths
+
+Returns:
+- Result<T>
+- Error codes
+- Deterministic failures
+
+Rule:
+Middleware = "System safety"
+Pipeline = "Business correctness"

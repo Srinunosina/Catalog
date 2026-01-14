@@ -1,0 +1,178 @@
+
+ASP.NET Core Middleware Order (Recommended)
+
+1) Hosting / Reverse-Proxy Infrastructure (VERY EARLY)
+
+Responsibility:
+Handles reverse proxies, load balancers, HTTPS enforcement, and forwarded headers.
+
+Example:
+1. app.UseForwardedHeaders();
+2. app.UseHttpsRedirection();
+3. app.UseHsts(); // production only
+
+Purpose:
+Everything downstream depends on correct scheme, host, IP, and protocol resolution.
+
+Not for:
+- Authentication
+- Authorization
+- Application logic
+
+
+2) Observability & Diagnostics
+
+Responsibility:
+Provides request-level visibility across logs, traces, and metrics.
+
+Example:
+1. app.UseSerilogRequestLogging();
+2. Correlation-ID middleware
+3. OpenTelemetry tracing / metrics
+
+Purpose:
+Enable traceability, debugging, and production observability.
+
+Not for:
+- Business logic
+- Error handling decisions
+
+
+3) Global HTTP Exception Handling (Last-Resort)
+
+Responsibility:
+Catches unhandled HTTP-level failures and converts them into standardized responses.
+
+Example:
+app.UseExceptionHandler("/error");
+
+Purpose:
+Prevent crashes and return safe, predictable HTTP responses.
+
+Important:
+- Handles infrastructure & framework exceptions only
+- NOT domain errors
+- NOT application failures
+- NOT a replacement for MediatR pipeline behaviors
+
+
+4) Security Headers & Response Hardening
+
+Responsibility:
+Adds browser-level security protections via HTTP headers.
+
+Example:
+Custom middleware adding:
+- X-Content-Type-Options: nosniff
+- X-Frame-Options: DENY
+
+Purpose:
+Mitigate clickjacking, MIME sniffing, and browser-based attacks.
+
+Not for:
+- Authentication
+- Authorization
+
+
+5) CORS (Before Authentication)
+
+Responsibility:
+Controls which origins can access your API from browsers.
+
+Example:
+app.UseCors("DefaultPolicy");
+
+Purpose:
+Browsers enforce CORS before credentials are sent.
+
+Why here:
+Must run before authentication or browser requests fail early.
+
+
+6) Authentication
+
+Responsibility:
+Resolves who the caller is.
+
+Example:
+app.UseAuthentication();
+
+Purpose:
+Populate HttpContext.User with identity claims.
+
+Not for:
+- Permission checks
+- Business authorization logic
+
+
+7) Authorization
+
+Responsibility:
+Enforces what the caller is allowed to do.
+
+Example:
+app.UseAuthorization();
+
+Purpose:
+Apply policies, roles, and permission rules.
+
+
+8) Rate Limiting / Throttling (Optional but Real-World)
+
+Responsibility:
+Protect APIs from abuse and accidental overload.
+
+Example:
+app.UseRateLimiter();
+
+Purpose:
+Stability, fairness, and DoS protection.
+
+Not for:
+- Business throttling rules
+
+
+9) Routing
+
+Responsibility:
+Matches incoming requests to endpoints.
+
+Example:
+app.UseRouting();
+
+Purpose:
+Selects which endpoint will handle the request.
+
+Important:
+No execution happens here — matching only.
+
+
+10) Endpoint Execution (Presentation Boundary)
+
+Responsibility:
+Executes controllers or minimal APIs.
+
+Example:
+app.MapControllers();
+
+Purpose:
+This is where Presentation ENDS.
+
+Rule:
+Everything after this is Application execution via MediatR.
+
+
+11) API Documentation / Dev-Only Tools
+
+Responsibility:
+Expose diagnostics and documentation for developers.
+
+Example:
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI();
+}
+
+Purpose:
+Developer productivity and API discoverability.

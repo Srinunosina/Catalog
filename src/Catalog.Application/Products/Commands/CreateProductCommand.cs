@@ -1,7 +1,5 @@
-﻿namespace Catalog.Application.Products.Commands;
-public sealed class CreateProductCommand
-{
-    public string Sku { get; init; } = default!;
-    public string Name { get; init; } = default!;
-    public decimal Price { get; init; }
-}
+﻿using Catalog.Application.Shared.Results;
+using MediatR;
+
+namespace Catalog.Application.Products.Commands;
+public sealed record CreateProductCommand(string Sku, string Name, decimal Price) : IRequest<Result<Guid>>;
