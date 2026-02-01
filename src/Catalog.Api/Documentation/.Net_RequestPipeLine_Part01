@@ -1,0 +1,245 @@
+Global exception middleware operates at the HTTP level and has no visibility
+into action execution details.
+
+If action-level context is required, ExceptionFilters are the correct boundary.
+
+In the absence of MediatR, ExceptionFilters should translate downstream
+exceptions into Result.Failure objects enriched with action context,
+and then delegate serialization to global middleware.
+
+With MediatR, exception behaviors normalize all downstream failures
+into Result.Failure at the application boundary,
+ensuring controllers handle only deterministic results and no exceptions.
+
+
+
+
+1. If a request flows from the UI through MediatR into the Application layer,
+   all downstream exceptions are observable by MediatR behaviors,
+   provided those behaviors are registered.
+
+2. If services are injected directly into the UI layer without MediatR,
+   downstream exceptions are only observable by MVC actions,
+   middleware, or exception filters.
+
+3. In background services or message-queue processing,
+   exceptions are not observable by UI-level mechanisms.
+   A dedicated execution boundary must exist at the worker/consumer level
+   to handle failures consistently (retry, DLQ, compensation, alerting).
+
+Architectural invariant:
+Every execution model must define exactly one global failure boundary.
+-------------------------------
+
+1. If there is no MediatR, we must use an ExceptionFilter to handle application-wide and downstream exceptions.
+-------------------------------
+Controller Action
+   ↓
+Application / Domain / Infra
+   ↓ throws exception
+ExceptionFilter
+   ↓ enrich with action context
+Global Exception Middleware
+   ↓
+HTTP Response
+
+
+Responsibilities split
+
+ExceptionFilter
+
+Understands what action failed
+
+Maps domain/application exceptions
+
+Enriches with:
+
+action name
+
+input context
+
+business meaning
+
+Converts to Result.Failure
+
+Global Middleware
+
+Serializes result
+
+Handles unknown / catastrophic failures
+
+Ensures response consistency
+
+Key invariant
+
+Exceptions are converted to Results before leaving the MVC boundary.
+
+This makes the system deterministic even without MediatR.
+
+
+2. With MediatR (Preferred)
+-------------------------------
+With MediatR, exception behaviors convert downstream exceptions into Result.Failure.
+
+Flow
+Controller
+   ↓
+MediatR
+   ↓
+[ExceptionBehavior]
+   ↓
+Handler / Domain / Infra
+
+Outcome
+
+No exceptions escape the Application layer
+
+Controllers receive only:
+
+Result.Success
+
+Result.Failure
+
+Controllers become pure translators
+
+return result.Match(Ok, Problem);
+
+Architectural invariant
+
+With MediatR, exceptions never cross the Application boundary.
+
+| Setup                | Where exceptions are handled | Determinism |
+| -------------------- | ---------------------------- | ----------- |
+| Middleware only      | HTTP layer                   | ❌ Low       |
+| ExceptionFilter only | UI layer                     | ⚠️ Medium   |
+| MediatR behavior     | Application boundary         | ✅ High      |
+| Result-only pipeline | Everywhere                   | 🟢 Maximum  |
+
+
+One-Line Insight (This is strong)
+
+Middleware guarantees safety.
+Filters provide context.
+MediatR enforces determinism.
+
+--------------------------
+
+1️⃣ MediatR Pipeline (Application Boundary)
+
+Your ExceptionHandlingBehavior is architecturally correct:
+
+Catches DomainException
+
+Catches unexpected infra/system exceptions
+
+Converts everything into Result.Failure
+
+Enforces:
+
+No exceptions escape the Application layer
+
+✅ Determinism guaranteed inside MediatR
+
+2️⃣ Global Exception Middleware (HTTP Safety Net)
+
+Your GlobalExceptionMiddleware is also correctly scoped:
+
+Operates only on HttpContext
+
+Handles:
+
+catastrophic failures
+
+programming errors
+
+anything that escaped all other boundaries
+
+Produces ProblemDetails
+
+✅ This is a last-resort circuit breaker, not business logic
+
+The Missing Piece (You’re Right)
+
+Requests that do NOT go through MediatR
+
+Examples:
+
+MVC actions using injected services directly
+
+File uploads
+
+Health checks
+
+Legacy controllers
+
+Third-party callbacks
+
+Model binding / action execution failures
+
+These currently:
+
+bypass MediatR behaviors
+
+bubble straight to middleware
+
+lose action-level context
+
+break determinism
+
+👉 This is exactly where a global ExceptionFilter belongs
+
+What the Global ExceptionFilter Must Do (Strict Rules)
+
+The filter must:
+
+Catch all downstream exceptions
+
+Have access to:
+
+Controller
+
+Action
+
+Route values
+
+Arguments
+
+Convert exceptions into Result.Failure
+
+Attach enriched context
+
+Hand off serialization to middleware
+
+🚫 It must NOT:
+
+Write the response directly
+
+Return ProblemDetails
+
+Log infrastructure details redundantly
+
+------------------------------
+
+| Request Path        | Failure Boundary            | Outcome                |
+| ------------------- | --------------------------- | ---------------------- |
+| UI → MediatR        | `ExceptionHandlingBehavior` | `Result.Failure`       |
+| UI → Direct Service | `GlobalExceptionFilter`     | `Result.Failure`       |
+| Anything uncaught   | `GlobalExceptionMiddleware` | `ProblemDetails`       |
+| Background / Queue  | Worker boundary             | Controlled retry / DLQ |
+
+
+Determinism requires not only a failure boundary, but clear ownership of context.
+
+HTTP-originated requests carry execution intent at the MVC action level.
+When MediatR is absent, ExceptionFilters act as the enrichment boundary,
+capturing action metadata and translating downstream exceptions into Result.Failure.
+
+When MediatR is present, the Application pipeline owns failure normalization.
+The request type itself represents execution intent, eliminating the need
+for action-level enrichment.
+
+Global middleware remains a safety net only, responsible for serialization,
+never interpretation.
+
+Each execution model defines a single owner of failure translation,
+ensuring consistent, deterministic behavior regardless of request origin.

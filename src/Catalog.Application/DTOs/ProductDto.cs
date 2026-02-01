@@ -3,6 +3,6 @@ public record ProductDto(
     Guid Id,
     string Sku,
     string Name,
-   // decimal Price,
+    decimal Price,
     bool IsActive
 );

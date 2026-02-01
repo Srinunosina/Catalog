@@ -1,4 +1,13 @@
-﻿using Catalog.Application.Shared.Results;
+﻿using Catalog.Api.Results;
+using Catalog.Application.Shared.Results;
+using Microsoft.AspNetCore.Mvc;
+public static class ResultExtensions
+{
+    public static IActionResult ToResponse(this ResultBase result) => new ResultActionResult(result);
+}
+
+/**
+using Catalog.Application.Shared.Results;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Catalog.Api.Results;
@@ -17,3 +26,4 @@ public static class ResultExtensions
         return new ResultActionResult<object>(genericResult);
     }
 }
+**/

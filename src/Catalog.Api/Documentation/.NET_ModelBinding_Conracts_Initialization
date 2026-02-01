@@ -1,4 +1,124 @@
 
+Feature                          | MVC Controller | API Controller ([ApiController])
+---------------------------------|----------------|-----------------------------------
+Simple type binding              | Yes            | Yes
+Complex type binding             | Yes            | Yes
+Binding source inference         | No             | Yes
+Automatic 400 on invalid ModelState | No         | Yes
+Automatic ProblemDetails         | No             | Yes
+Required parameter enforcement  | No             | Yes
+Ambiguous binding detection      | No             | Yes
+Missing body detection           | No             | Yes
+
+
+1. ControllerBase is the core MVC controller type
+---------------------------------------
+ControllerBase is the foundation for all MVC controllers.
+
+It provides: HttpContext, Request, Response , RouteData , ModelState, 
+             ControllerContext, Url, ObjectValidator, ModelBinderFactory, ProblemDetailsFactory
+
+But it does NOT enforce any API-specific behavior.
+
+It is intentionally neutral.
+
+✔ It supports MVC
+✔ It supports Web API
+✔ It supports Razor Pages (indirectly)
+✔ It supports custom pipelines
+It is the base class for controllers, not the policy for controllers.
+
+2. [ApiController] is NOT a controller base class — it is a behavior modifier
+---------------------------------------
+This is the key point.
+
+[ApiController] is not a controller type.
+It is an attribute that activates a set of API-specific conventions.
+
+When you apply:
+
+csharp
+[ApiController]
+you are telling ASP.NET Core:
+
+“This controller is an API endpoint.
+Apply API-specific rules.”
+
+Those rules include:
+
+✔ Automatic model validation
+If ModelState.IsValid == false, MVC short-circuits and returns 400.
+
+✔ Automatic parameter binding
+Simple types come from route/query by default.
+
+✔ Automatic 400 responses
+No need to check ModelState manually.
+
+✔ ProblemDetails formatting
+Errors follow RFC 7807.
+
+✔ Binding source inference
+[FromBody], [FromQuery], [FromRoute] inferred automatically.
+
+✔ Consistent API error responses
+No HTML, no view rendering.
+
+3. Why does ModelState validation only happen with [ApiController]?
+---------------------------------------
+Because model validation is not part of MVC by default.
+
+MVC only:
+
+Binds the model
+
+Populates ModelState
+
+Leaves the decision to you
+
+Before ASP.NET Core 2.1, developers had to write:
+
+csharp
+if (!ModelState.IsValid)
+    return BadRequest(ModelState);
+This was error-prone and inconsistent.
+
+So Microsoft introduced [ApiController] to enforce:
+
+“If this is an API, treat validation failures as API errors.”
+
+That’s why model-binding failures are tied to [ApiController], not to ControllerBase.
+
+4. Why two hierarchies? Because they solve different problems
+------------------------------------------------------------
+ControllerBase = infrastructure
+Provides MVC plumbing
+
+No opinions
+
+No automatic behavior
+
+No API conventions
+
+[ApiController] = policy
+Adds API-specific conventions
+
+Enforces validation
+
+Enforces binding rules
+
+Enforces consistent error responses
+
+They are intentionally separate so you can choose:
+
+MVC controllers with views → Controller
+
+API controllers with conventions → ControllerBase + [ApiController]
+
+API controllers without conventions → ControllerBase only
+
+Custom pipelines → ControllerBase + your own filters
+------------------------------------------------------------
 Who creates API contract objects if they are NOT in DI?
 Key clarification first
 

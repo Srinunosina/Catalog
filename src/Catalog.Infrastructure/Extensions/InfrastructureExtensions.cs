@@ -1,4 +1,5 @@
 ﻿using Catalog.Application.interfaces;
+using Catalog.Infrastructure.Logging;
 using Catalog.Infrastructure.Mapping;
 using Catalog.Infrastructure.Persistence;
 using Catalog.Infrastructure.Repositories;
@@ -22,7 +23,20 @@ public static class InfrastructureExtensions
         services.AddSingleton(mapsterConfig);
 
         services.AddTransient<IProductReadRepository, ProductReadRepository>();
-        services.AddTransient<IProductRepository, ProductRepository>();     
+        services.AddTransient<IProductRepository, ProductRepository>();
+
+
+       // services.AddHttpContextAccessor();
+
+        services.AddScoped(typeof(IAppLogger<>), typeof(AppLogger<>));
+        services.AddScoped<ICorrelationContext, HttpCorrelationContext>();
+
+        // Enable / disable sinks here
+        services.AddScoped<ILogSink, ConsoleLogSink>();
+        services.AddScoped<ILogSink, FileLogSink>();
+        //   services.AddScoped<ILogSink, DatabaseLogSink>();
+        //  services.AddDbContext<LogDbContext>(options => options.UseSqlServer(builder.Configuration.GetConnectionString("Logs")));
+
 
         return services;
     }

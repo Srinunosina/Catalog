@@ -1,9 +1,8 @@
 ﻿namespace Catalog.Application.Shared.Results;
-public sealed class Result<T> : ResultBase
+public class Result<T> : ResultBase
 {
     public T? Value { get; }
-
-    private Result(bool isSuccess, T? value, Error? error) : base(isSuccess, error)
+    public Result(bool isSuccess, T? value, Error? error) : base(isSuccess, error)
     {
         Value = value;
     }

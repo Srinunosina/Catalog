@@ -9,6 +9,8 @@ public sealed class CatalogDbContext : DbContext
 
     public DbSet<Product> Products => Set<Product>();
 
+   // public DbSet<LogEntity> Logs => Set<LogEntity>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(CatalogDbContext).Assembly);

@@ -1,17 +1,14 @@
-﻿namespace Catalog.Api.Middleware;
-public sealed class GlobalExceptionMiddleware : IMiddleware
+﻿using Catalog.Application.Shared.Results;
+using Microsoft.AspNetCore.Mvc;
+using System.Diagnostics;
+
+namespace Catalog.Api.Middleware;
+public sealed class GlobalExceptionMiddleware (
+    IProblemDetailsService problemDetails,
+    ILogger<GlobalExceptionMiddleware> logger
+
+    ) : IMiddleware
 {
-    private readonly IProblemDetailsService _problemDetails;
-    private readonly ILogger<GlobalExceptionMiddleware> _logger;
-
-    public GlobalExceptionMiddleware(
-        IProblemDetailsService problemDetails,
-        ILogger<GlobalExceptionMiddleware> logger)
-    {
-        _problemDetails = problemDetails;
-        _logger = logger;
-    }
-
     public async Task InvokeAsync(HttpContext context, RequestDelegate next)
     {
         try
@@ -20,23 +17,44 @@ public sealed class GlobalExceptionMiddleware : IMiddleware
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Unhandled exception occurred");
+            var traceId = Activity.Current?.Id ?? context.TraceIdentifier;
 
-            context.Response.StatusCode = StatusCodes.Status500InternalServerError;
+            logger.LogError(ex,
+                "Unhandled exception | TraceId: {TraceId} | Path: {Path}",
+                traceId,
+                context.Request.Path);
 
-            await _problemDetails.WriteAsync(new ProblemDetailsContext
+            var env = context.RequestServices.GetRequiredService<IHostEnvironment>();
+
+            await problemDetails.WriteAsync(new ProblemDetailsContext
             {
                 HttpContext = context,
                 ProblemDetails =
+            {
+                Title = "Internal Server Error",
+                Detail = env.IsDevelopment()
+                    ? ex.Message
+                    : "An unexpected error occurred. Please contact support.",
+                Status = StatusCodes.Status500InternalServerError,
+                Instance = context.Request.Path,
+                Extensions =
                 {
-                    Title = "An unexpected error occurred.",
-                    Detail = ex.Message,
-                    Status = StatusCodes.Status500InternalServerError,
-                    Instance = context.Request.Path
+                    ["traceId"] = traceId
                 }
+            }
             });
         }
     }
 }
 
+// Summary of Exception Handling Flow
+/**
+ 
+| Origin             | Translation                             | Normalization        |
+| ------------------ | --------------------------------------- | -------------------- |
+| MediatR            | `ExceptionHandlingBehavior`             | `ResultActionResult` |
+| MVC(no MediatR)   | `GlobalExceptionFilter`                 | `ResultActionResult` |
+| Controller success | `return new ResultActionResult(result)` | `ResultActionResult` |
+| Uncaught           | GlobalExceptionMiddleware               | `ProblemDetails`     |
 
+**/

@@ -1,3 +1,19 @@
+1. If a request flows from the UI through MediatR into the Application layer,
+   all downstream exceptions are observable by MediatR behaviors,
+   provided those behaviors are registered.
+
+2. If services are injected directly into the UI layer without MediatR,
+   downstream exceptions are only observable by MVC actions,
+   middleware, or exception filters.
+
+3. In background services or message-queue processing,
+   exceptions are not observable by UI-level mechanisms.
+   A dedicated execution boundary must exist at the worker/consumer level
+   to handle failures consistently (retry, DLQ, compensation, alerting).
+
+Architectural invariant:
+Every execution model must define exactly one global failure boundary.
+
 
 What is a MediatR:
 -------------------------------------
@@ -118,11 +134,13 @@ Routing
    ↓
 Model Binding
    ↓
-Controller
+Model Validation (ModelState)
+   ↓
+Controller Action
    ↓
 mediator.Send()
    ↓
-MediatR Pipeline
+MediatR Pipeline Behaviors (FluentValidation etc.)
    ↓
 Handler
    ↓

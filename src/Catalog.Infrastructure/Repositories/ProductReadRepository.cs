@@ -22,4 +22,23 @@ public class ProductReadRepository : IProductReadRepository
         return products;
         
     }
+    public async Task<(IEnumerable<ProductDto>, int)> GetPagedAsync(
+    int page,
+    int pageSize,
+    CancellationToken ct)
+    {
+        var query = _dbContext.Products.AsNoTracking();
+
+        var totalCount = await query.CountAsync(ct);
+
+        var items = await query
+            .OrderBy(p => p.Id)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(p => new ProductDto(p.Id, "SKU-1.0", p.Name, p.Price, true))
+            .ToListAsync(ct);
+
+        return (items, totalCount);
+    }
+
 }

@@ -1,4 +1,8 @@
-﻿using Catalog.Api.Middleware;
+﻿using Catalog.Api.ActionFilter;
+using Catalog.Api.Middleware;
+using Catalog.Application.Shared.Results;
+using Catalog.Infrastructure.Logging;
+using Microsoft.CodeAnalysis.Options;
 using Microsoft.OpenApi;
 
 namespace Catalog.Api.Extentions;
@@ -7,7 +11,19 @@ public static class PresentationExtensions
 {
     public static IServiceCollection AddPresentation(this IServiceCollection services)
     {
-        services.AddControllers();
+        services.AddControllers(options =>
+        {
+            //To handle model validation error register only if controllres not decorated with [ApiController]
+            // options.Filters.Add<ModelValidationFilter>();
+
+            // Global exception filter for unhandled exceptions outside MediatR pipeline
+            options.Filters.Add<GlobalExceptionFilter>();
+
+        });
+
+        services.AddHttpContextAccessor();
+
+
         services.AddEndpointsApiExplorer();
         services.AddSwaggerGen();
         services.AddProblemDetails();
