@@ -20,17 +20,18 @@ public class ProductsController(
     public IActionResult Test()
     {
         appLogger.Info("Order processing started");
+        logger.LogInformation("Enricher:Order processing started");
 
-        //try
-        //{
+        try
+        {
             throw new InvalidOperationException("Boom");
-        //}
-        //catch (Exception ex)
-        //{
-        //    appLogger.Error(ex, "Order processing failed");
-        //}
+        }
+        catch (Exception ex)
+        {
+            appLogger.Error(ex, "Order processing failed");
+        }
 
-        //return Ok("Logged to all sinks");
+        return Ok("Logged to all sinks");
     }
 
     [HttpGet]

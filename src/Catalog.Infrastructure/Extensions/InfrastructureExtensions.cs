@@ -7,6 +7,7 @@ using Mapster;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace Catalog.Infrastructure.Extensions;
 
@@ -25,9 +26,6 @@ public static class InfrastructureExtensions
         services.AddTransient<IProductReadRepository, ProductReadRepository>();
         services.AddTransient<IProductRepository, ProductRepository>();
 
-
-       // services.AddHttpContextAccessor();
-
         services.AddScoped(typeof(IAppLogger<>), typeof(AppLogger<>));
         services.AddScoped<ICorrelationContext, HttpCorrelationContext>();
 
@@ -36,7 +34,6 @@ public static class InfrastructureExtensions
         services.AddScoped<ILogSink, FileLogSink>();
         //   services.AddScoped<ILogSink, DatabaseLogSink>();
         //  services.AddDbContext<LogDbContext>(options => options.UseSqlServer(builder.Configuration.GetConnectionString("Logs")));
-
 
         return services;
     }

@@ -1,8 +1,6 @@
 ﻿using Catalog.Api.ActionFilter;
 using Catalog.Api.Middleware;
-using Catalog.Application.Shared.Results;
-using Catalog.Infrastructure.Logging;
-using Microsoft.CodeAnalysis.Options;
+using Catalog.Api.Middlewares;
 using Microsoft.OpenApi;
 
 namespace Catalog.Api.Extentions;
@@ -21,8 +19,7 @@ public static class PresentationExtensions
 
         });
 
-        services.AddHttpContextAccessor();
-
+        services.AddHttpContextAccessor();         
 
         services.AddEndpointsApiExplorer();
         services.AddSwaggerGen();
@@ -37,14 +34,15 @@ public static class PresentationExtensions
             });
         });
 
-        services.AddTransient<GlobalExceptionMiddleware>();
-
+        services.AddTransient<GlobalExceptionMiddleware>();       
         return services;
     }
 
     public static IApplicationBuilder UsePresentation(this WebApplication app)
     {
         app.UseMiddleware<GlobalExceptionMiddleware>();
+        app.UseMiddleware<CorrelationLoggingMiddleware>();
+
         // Developer exception page
         if (app.Environment.IsDevelopment())
         {

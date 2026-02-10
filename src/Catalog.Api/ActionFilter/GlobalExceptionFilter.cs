@@ -12,13 +12,6 @@ public sealed class GlobalExceptionFilter (
     ILogger<GlobalExceptionFilter> logger
     ) : IExceptionFilter
 {
-    //private readonly ILogger<GlobalExceptionFilter> logger;
-
-    //public GlobalExceptionFilter(ILogger<GlobalExceptionFilter> logger)
-    //{
-    //    this.logger = logger;
-    //}
-
     public void OnException(ExceptionContext context)
     {
         var action = context.ActionDescriptor.DisplayName;
