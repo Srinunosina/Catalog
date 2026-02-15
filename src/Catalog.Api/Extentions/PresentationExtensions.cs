@@ -2,6 +2,10 @@
 using Catalog.Api.Middleware;
 using Catalog.Api.Middlewares;
 using Microsoft.OpenApi;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
+using System.Diagnostics;
 
 namespace Catalog.Api.Extentions;
 
@@ -37,6 +41,28 @@ public static class PresentationExtensions
         services.AddTransient<GlobalExceptionMiddleware>();       
         return services;
     }
+    //public static WebApplicationBuilder AddObservability(this WebApplicationBuilder builder)
+    //{
+    //    builder.Services.AddOpenTelemetry()
+    //    .ConfigureResource(r => r.AddService("Catalog.Api"))
+    //    .WithTracing(tracing =>
+    //    {
+    //        tracing
+    //            .AddSource("Catalog.MediatR")   // MUST match your ActivitySource name
+    //            .AddAspNetCoreInstrumentation()
+    //            .AddSqlClientInstrumentation()
+    //            .AddConsoleExporter();
+    //    })
+    //    .WithMetrics(metrics =>
+    //    {
+    //        metrics
+    //            .AddMeter("Catalog.MediatR")   // MUST match your Meter name
+    //            .AddAspNetCoreInstrumentation()
+    //            .AddConsoleExporter();
+    //    });
+
+    //    return builder;
+    //}
 
     public static IApplicationBuilder UsePresentation(this WebApplication app)
     {
@@ -58,9 +84,25 @@ public static class PresentationExtensions
 
         // Routing
         app.MapControllers();
-
+  
         return app;
     }
+    //public static IHostApplicationBuilder AddManualObservability(this IHostApplicationBuilder builder)
+    //{
+    //    // Since we are not using OpenTelemetry yet, we manually register the listener.
+    //    // This ensures ActivitySource.StartActivity(...) actually produces a non-null Activity.
+    //    ActivitySource.AddActivityListener(new ActivityListener
+    //    {
+    //        ShouldListenTo = source => true,
+    //        Sample = (ref ActivityCreationOptions<ActivityContext> _) =>
+    //            ActivitySamplingResult.AllDataAndRecorded,
+    //        SampleUsingParentId = (ref ActivityCreationOptions<string> _) =>
+    //            ActivitySamplingResult.AllDataAndRecorded
+    //    });
+
+    //    return builder;
+    //}
+    
 
     /**
      UI Layer → Middlewares

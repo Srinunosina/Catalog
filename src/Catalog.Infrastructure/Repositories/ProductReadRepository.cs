@@ -3,31 +3,30 @@ using Catalog.Application.interfaces;
 using Catalog.Infrastructure.Persistence;
 using Mapster;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
+using System.Diagnostics;
 namespace Catalog.Infrastructure.Repositories;
 
-public class ProductReadRepository : IProductReadRepository
+public class ProductReadRepository(
+    CatalogDbContext dbContext,
+    ILogger<ProductReadRepository> logger
+    ) : IProductReadRepository
 {
-    private readonly CatalogDbContext _dbContext;
-    public ProductReadRepository(CatalogDbContext dbContext)
-    {
-        _dbContext = dbContext;
-    }
-
     public async Task<IEnumerable<ProductDto>> GetProductsAsync(CancellationToken ct)
     {
-        var products = await _dbContext.Products.AsNoTracking()
+        var stopwatch = Stopwatch.StartNew();
+        var products = await dbContext.Products.AsNoTracking()
                             .ProjectToType<ProductDto>()
                             .ToListAsync(ct);
+        stopwatch.Stop();
 
+        logger.LogCritical("----- GetProductsAsync - ElapsedMilliseconds={ElapsedMilliseconds}  --------", stopwatch.ElapsedMilliseconds);
         return products;
-        
     }
-    public async Task<(IEnumerable<ProductDto>, int)> GetPagedAsync(
-    int page,
-    int pageSize,
-    CancellationToken ct)
+
+    public async Task<(IEnumerable<ProductDto>, int)> GetPagedAsync(int page,  int pageSize, CancellationToken ct)
     {
-        var query = _dbContext.Products.AsNoTracking();
+        var query = dbContext.Products.AsNoTracking();
 
         var totalCount = await query.CountAsync(ct);
 
@@ -40,5 +39,5 @@ public class ProductReadRepository : IProductReadRepository
 
         return (items, totalCount);
     }
-
 }
+  

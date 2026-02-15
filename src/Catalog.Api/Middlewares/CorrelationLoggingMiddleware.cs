@@ -1,13 +1,18 @@
 ﻿
+using System.Diagnostics;
+
 namespace Catalog.Api.Middlewares;
 public sealed class CorrelationLoggingMiddleware(RequestDelegate next)
 {
     public async Task Invoke(HttpContext context, ILogger<CorrelationLoggingMiddleware> logger)
     {
-        var correlationId = context.TraceIdentifier;
+        var traceId = Activity.Current?.TraceId.ToString()
+                     ?? context.TraceIdentifier;
+
+        context.Response.Headers["X-Correlation-Id"] = traceId;
 
         using (logger.BeginScope("CorrelationId={CorrelationId}, Application={Application}",
-            correlationId,
+            traceId,
             "Srinu Nosina Middleware Enricher"))
         {
             await next(context);

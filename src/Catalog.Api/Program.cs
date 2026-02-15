@@ -2,6 +2,10 @@
 using Catalog.Application.Extensions;
 using Catalog.Infrastructure.Extensions;
 using Microsoft.Extensions.Logging;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
+using System.Diagnostics;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -13,8 +17,16 @@ builder.Logging.AddConsole(options =>
     options.IncludeScopes = true;
 });
 
-builder.Logging.AddDebug();
+builder.Logging.Configure(options =>
+{
+    options.ActivityTrackingOptions =
+        ActivityTrackingOptions.TraceId |
+        ActivityTrackingOptions.SpanId |
+        ActivityTrackingOptions.ParentId;
+});
 
+builder.Logging.AddDebug();
+builder.AddObservability();
 builder.Services
     .AddPresentation()     // Controllers, Swagger, Middleware
     .AddApplication()      // MediatR, Behaviors, IResult, Validators
